@@ -2,6 +2,13 @@
   "mcpServers": {
     "forge_extension": {
       "url": "http://localhost:48775/mcp"
+    },
+    "mcp-docs-server": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@assistant-ui/mcp-docs-server"
+      ]
     }
   }
 }
