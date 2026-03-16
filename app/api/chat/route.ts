@@ -1,4 +1,4 @@
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
 import { frontendTools } from "@assistant-ui/react-ai-sdk";
 import {
   JSONSchema7,
@@ -6,6 +6,19 @@ import {
   convertToModelMessages,
   type UIMessage,
 } from "ai";
+
+const usingOpenRouter = !!process.env.OPENROUTER_API_KEY;
+
+const provider = usingOpenRouter
+  ? createOpenAI({
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: process.env.OPENROUTER_API_KEY,
+    })
+  : createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+const model = usingOpenRouter
+  ? provider.chat(process.env.OPENROUTER_MODEL ?? "openai/gpt-4o-mini")
+  : provider.responses(process.env.OPENAI_MODEL ?? "gpt-4o-mini");
 
 export async function POST(req: Request) {
   const {
@@ -19,18 +32,20 @@ export async function POST(req: Request) {
   } = await req.json();
 
   const result = streamText({
-    model: openai.responses("gpt-5-nano"),
+    model,
     messages: await convertToModelMessages(messages),
     system,
     tools: {
       ...frontendTools(tools ?? {}),
     },
-    providerOptions: {
-      openai: {
-        reasoningEffort: "low",
-        reasoningSummary: "auto",
+    ...(!usingOpenRouter && {
+      providerOptions: {
+        openai: {
+          reasoningEffort: "low",
+          reasoningSummary: "auto",
+        },
       },
-    },
+    }),
   });
 
   return result.toUIMessageStreamResponse({
