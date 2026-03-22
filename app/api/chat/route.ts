@@ -6,6 +6,7 @@ import {
 	streamText,
 	type UIMessage,
 } from "ai";
+import { estimateTokens, getMaxTokens } from "@/lib/token-counter";
 
 const usingOpenRouter = !!process.env.OPENROUTER_API_KEY;
 
@@ -41,9 +42,46 @@ export async function POST(req: Request) {
 	const modelId = requestedModel || defaultModelId;
 	const model = createModel(modelId);
 
+	// --- Context window management ---
+	// Trim the oldest messages if the conversation exceeds 45% of the
+	// model's context window.  The system prompt is injected separately
+	// (not inside `messages`), so every UIMessage here is user/assistant.
+	const maxTokens = getMaxTokens(modelId);
+	const MIN_KEEP_RECENT = 4;
+
+	/** Extract the text content of a UIMessage for token estimation. */
+	function uiMessageText(m: UIMessage): string {
+		return m.parts
+			.map((p) => {
+				if (p.type === "text") return p.text;
+				if (p.type === "reasoning") return p.text ?? "";
+				return "";
+			})
+			.join("");
+	}
+
+	let trimmedMessages = messages;
+	let totalTokens = messages.reduce(
+		(sum, m) => sum + estimateTokens(uiMessageText(m)),
+		0,
+	);
+
+	if (totalTokens > maxTokens && messages.length > MIN_KEEP_RECENT) {
+		// Keep the last MIN_KEEP_RECENT messages, remove oldest first.
+		const protectedEnd = messages.length - MIN_KEEP_RECENT;
+		const removeSet = new Set<number>();
+
+		for (let i = 0; i < protectedEnd && totalTokens > maxTokens; i++) {
+			totalTokens -= estimateTokens(uiMessageText(messages[i]));
+			removeSet.add(i);
+		}
+
+		trimmedMessages = messages.filter((_, i) => !removeSet.has(i));
+	}
+
 	const result = streamText({
 		model,
-		messages: await convertToModelMessages(messages),
+		messages: await convertToModelMessages(trimmedMessages),
 		system: SYSTEM_PROMPT,
 		tools: {
 			...frontendTools(tools ?? {}),
