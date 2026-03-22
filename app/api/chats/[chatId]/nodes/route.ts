@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import {
-  getChatNodesWithMetadata,
-  getOrCreateChat,
-  saveNode,
-  saveNodeMetadata,
+	getChatNodesWithMetadata,
+	getOrCreateChat,
+	saveNode,
+	saveNodeMetadata,
 } from "@/lib/chat-persistence";
+import { getSession } from "@/lib/session";
 import {
-  validateString,
-  validateRole,
-  MAX_ID_LENGTH,
-  MAX_CONTENT_LENGTH,
+	MAX_CONTENT_LENGTH,
+	MAX_ID_LENGTH,
+	validateRole,
+	validateString,
 } from "@/lib/validation";
 
 /**
@@ -17,20 +18,17 @@ import {
  * Returns nodes with their metadata for rebuilding the tree.
  */
 export async function GET(
-  _req: Request,
-  { params }: { params: Promise<{ chatId: string }> },
+	_req: Request,
+	{ params }: { params: Promise<{ chatId: string }> },
 ) {
-  try {
-    const { chatId } = await params;
-    const nodes = await getChatNodesWithMetadata(chatId);
-    return NextResponse.json(nodes);
-  } catch (error) {
-    console.error("[GET /api/chats/[chatId]/nodes] Error:", error);
-    return NextResponse.json(
-      { error: "Failed to get nodes" },
-      { status: 500 },
-    );
-  }
+	try {
+		const { chatId } = await params;
+		const nodes = await getChatNodesWithMetadata(chatId);
+		return NextResponse.json(nodes);
+	} catch (error) {
+		console.error("[GET /api/chats/[chatId]/nodes] Error:", error);
+		return NextResponse.json({ error: "Failed to get nodes" }, { status: 500 });
+	}
 }
 
 /**
@@ -40,65 +38,63 @@ export async function GET(
  * The chat is created automatically if it doesn't exist yet.
  */
 export async function POST(
-  req: Request,
-  { params }: { params: Promise<{ chatId: string }> },
+	req: Request,
+	{ params }: { params: Promise<{ chatId: string }> },
 ) {
-  try {
-    const { chatId } = await params;
-    const body = await req.json();
-    const { id, parentId, role, content, metadata } = body as {
-      id?: string;
-      parentId?: string | null;
-      role?: string;
-      content?: string;
-      metadata?: {
-        provider?: string;
-        model?: string;
-        temperature?: number;
-        tokenCount?: number;
-      };
-    };
+	try {
+		const { chatId } = await params;
+		const body = await req.json();
+		const { id, parentId, role, content, metadata } = body as {
+			id?: string;
+			parentId?: string | null;
+			role?: string;
+			content?: string;
+			metadata?: {
+				provider?: string;
+				model?: string;
+				temperature?: number;
+				tokenCount?: number;
+			};
+		};
 
-    const idError = validateString(id, "id", MAX_ID_LENGTH);
-    if (idError) {
-      return NextResponse.json({ error: idError }, { status: 400 });
-    }
+		const idError = validateString(id, "id", MAX_ID_LENGTH);
+		if (idError) {
+			return NextResponse.json({ error: idError }, { status: 400 });
+		}
 
-    const roleError = validateRole(role);
-    if (roleError) {
-      return NextResponse.json({ error: roleError }, { status: 400 });
-    }
+		const roleError = validateRole(role);
+		if (roleError) {
+			return NextResponse.json({ error: roleError }, { status: 400 });
+		}
 
-    const contentError = validateString(content, "content", MAX_CONTENT_LENGTH);
-    if (contentError) {
-      return NextResponse.json({ error: contentError }, { status: 400 });
-    }
+		const contentError = validateString(content, "content", MAX_CONTENT_LENGTH);
+		if (contentError) {
+			return NextResponse.json({ error: contentError }, { status: 400 });
+		}
 
-    // Ensure the chat exists
-    await getOrCreateChat(chatId);
+		// Ensure the chat exists
+		const session = await getSession();
+		await getOrCreateChat(chatId, undefined, session?.userId);
 
-    await saveNode({
-      id: id!,
-      chatId,
-      parentId: parentId ?? null,
-      role: role as "user" | "assistant" | "system",
-      content: content!,
-    });
+		await saveNode({
+			id: id!,
+			chatId,
+			parentId: parentId ?? null,
+			role: role as "user" | "assistant" | "system",
+			content: content!,
+		});
 
-    // Save metadata if provided (typically for assistant messages)
-    if (metadata) {
-      await saveNodeMetadata({
-        nodeId: id!,
-        ...metadata,
-      });
-    }
+		// Save metadata if provided (typically for assistant messages)
+		if (metadata) {
+			await saveNodeMetadata({
+				nodeId: id!,
+				...metadata,
+			});
+		}
 
-    return NextResponse.json({ id, chatId }, { status: 201 });
-  } catch (error) {
-    console.error("[POST /api/chats/[chatId]/nodes] Error:", error);
-    return NextResponse.json(
-      { error: "Failed to save node" },
-      { status: 500 },
-    );
-  }
+		return NextResponse.json({ id, chatId }, { status: 201 });
+	} catch (error) {
+		console.error("[POST /api/chats/[chatId]/nodes] Error:", error);
+		return NextResponse.json({ error: "Failed to save node" }, { status: 500 });
+	}
 }

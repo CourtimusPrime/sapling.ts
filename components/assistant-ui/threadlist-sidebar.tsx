@@ -1,5 +1,5 @@
 import * as React from "react";
-import { TreePine, GitBranch } from "lucide-react";
+import { TreePine, GitBranch, Settings } from "lucide-react";
 import Link from "next/link";
 import {
   Sidebar,
@@ -57,6 +57,22 @@ export function ThreadListSidebar({
                 <div className="aui-sidebar-footer-heading flex flex-col gap-0.5 leading-none">
                   <span className="aui-sidebar-footer-title font-semibold">
                     Tree View
+                  </span>
+                </div>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" asChild>
+              <Link
+                href="/settings"
+              >
+                <div className="aui-sidebar-footer-icon-wrapper flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                  <Settings className="aui-sidebar-footer-icon size-4" />
+                </div>
+                <div className="aui-sidebar-footer-heading flex flex-col gap-0.5 leading-none">
+                  <span className="aui-sidebar-footer-title font-semibold">
+                    Settings
                   </span>
                 </div>
               </Link>

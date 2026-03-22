@@ -13,10 +13,14 @@ import {
  * Create a new chat record.
  * Uses onConflictDoNothing so repeated calls with the same id are safe.
  */
-export async function createChat(id: string, title?: string): Promise<void> {
+export async function createChat(
+	id: string,
+	title?: string,
+	userId?: string,
+): Promise<void> {
 	await db
 		.insert(chat)
-		.values({ id, title: title ?? null })
+		.values({ id, title: title ?? null, userId: userId ?? null })
 		.onConflictDoNothing();
 }
 
@@ -26,8 +30,9 @@ export async function createChat(id: string, title?: string): Promise<void> {
 export async function getOrCreateChat(
 	id: string,
 	title?: string,
+	userId?: string,
 ): Promise<Chat> {
-	await createChat(id, title);
+	await createChat(id, title, userId);
 
 	const rows = await db.select().from(chat).where(eq(chat.id, id)).limit(1);
 	return rows[0];
@@ -146,7 +151,14 @@ export async function getChatNodesWithMetadata(
 /**
  * List all chats ordered by most-recently-created first.
  */
-export async function listChats(): Promise<Chat[]> {
+export async function listChats(userId?: string): Promise<Chat[]> {
+	if (userId) {
+		return db
+			.select()
+			.from(chat)
+			.where(eq(chat.userId, userId))
+			.orderBy(desc(chat.createdAt));
+	}
 	return db.select().from(chat).orderBy(desc(chat.createdAt));
 }
 

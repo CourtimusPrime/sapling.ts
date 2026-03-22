@@ -12,7 +12,7 @@ import { useAuiState } from "@assistant-ui/store";
 import type { ChatTransport, UIMessage } from "ai";
 import { GitBranch, Search, X } from "lucide-react";
 import type React from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Thread } from "@/components/assistant-ui/thread";
 import { ThreadListSidebar } from "@/components/assistant-ui/threadlist-sidebar";
 import { ModelSelector } from "@/components/model-selector";
@@ -108,6 +108,21 @@ export const Assistant = () => {
 	const [searchOpen, setSearchOpen] = useState(false);
 	const isMobile = useIsMobile();
 
+	// Swipe-to-close gesture for mobile overlay
+	const touchStartX = useRef(0);
+
+	const handleTouchStart = useCallback((e: React.TouchEvent) => {
+		touchStartX.current = e.touches[0].clientX;
+	}, []);
+
+	const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+		const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+		if (deltaX > 100) {
+			setTreePanelOpen(false);
+			setSearchOpen(false);
+		}
+	}, []);
+
 	return (
 		<AssistantRuntimeProvider runtime={runtime}>
 			<SyncProvider>
@@ -133,7 +148,7 @@ export const Assistant = () => {
 									</BreadcrumbList>
 								</Breadcrumb>
 
-								<div className="ml-auto flex items-center gap-2">
+								<div className="ml-auto flex items-center gap-1 md:gap-2">
 									<ModelSelector />
 									<Button
 										variant="ghost"
@@ -144,15 +159,9 @@ export const Assistant = () => {
 												setTreePanelOpen(true);
 											}
 										}}
-										aria-label={
-											searchOpen
-												? "Close search"
-												: "Search messages"
-										}
+										aria-label={searchOpen ? "Close search" : "Search messages"}
 										className={
-											searchOpen
-												? "text-foreground"
-												: "text-muted-foreground"
+											searchOpen ? "text-foreground" : "text-muted-foreground"
 										}
 									>
 										<Search className="size-4" />
@@ -194,68 +203,74 @@ export const Assistant = () => {
 									<Thread />
 								</div>
 
-								{/* Tree panel - desktop: inline split, mobile: overlay */}
-								{treePanelOpen &&
-									(isMobile ? (
-										<div className="absolute inset-0 z-30 bg-background">
-											<div className="flex h-12 items-center justify-between border-b px-3">
-												<span className="flex items-center gap-2 text-sm font-medium text-foreground">
-													{searchOpen ? (
-														<>
-															<Search className="size-4" />
-															Search Messages
-														</>
-													) : (
-														<>
-															<GitBranch className="size-4" />
-															Conversation Tree
-														</>
-													)}
-												</span>
-												<Button
-													variant="ghost"
-													size="icon-sm"
-													onClick={() => {
-														setTreePanelOpen(false);
-														setSearchOpen(false);
-													}}
-													aria-label="Close panel"
-												>
-													<X className="size-4" />
-												</Button>
-											</div>
-											<div className="h-[calc(100%-3rem)]">
+								{/* Tree panel - mobile: always-mounted overlay with transitions */}
+								{isMobile && (
+									<div
+										className={`absolute inset-0 z-30 bg-background transition-all duration-200 ease-out ${
+											treePanelOpen
+												? "opacity-100 translate-x-0 pointer-events-auto"
+												: "opacity-0 translate-x-4 pointer-events-none"
+										}`}
+										onTouchStart={handleTouchStart}
+										onTouchEnd={handleTouchEnd}
+									>
+										<div className="flex h-12 items-center justify-between border-b px-3">
+											<span className="flex items-center gap-2 text-sm font-medium text-foreground">
 												{searchOpen ? (
-													<SearchPanel
-														onClose={() => setSearchOpen(false)}
-													/>
-												) : (
-													<TreePanel />
-												)}
-											</div>
-										</div>
-									) : (
-										<>
-											{/* Vertical divider */}
-											<div className="w-px shrink-0 bg-border" />
-
-											{/* Right panel (desktop) */}
-											<div className="flex-[2] min-w-0 overflow-hidden bg-background flex flex-col">
-												{searchOpen && (
 													<>
-														<div className="shrink-0 max-h-[50%] overflow-hidden border-b">
-															<SearchPanel
-																onClose={() => setSearchOpen(false)}
-															/>
-														</div>
+														<Search className="size-4" />
+														Search Messages
+													</>
+												) : (
+													<>
+														<GitBranch className="size-4" />
+														Conversation Tree
 													</>
 												)}
-												<div className="flex-1 min-h-0 overflow-hidden">
-													<TreePanel />
-												</div>
+											</span>
+											<Button
+												variant="ghost"
+												size="icon-sm"
+												onClick={() => {
+													setTreePanelOpen(false);
+													setSearchOpen(false);
+												}}
+												aria-label="Close panel"
+											>
+												<X className="size-4" />
+											</Button>
+										</div>
+										<div className="h-[calc(100%-3rem)]">
+											{searchOpen ? (
+												<SearchPanel onClose={() => setSearchOpen(false)} />
+											) : (
+												<TreePanel />
+											)}
+										</div>
+									</div>
+								)}
+
+								{/* Tree panel - desktop: inline split */}
+								{treePanelOpen && !isMobile && (
+									<>
+										{/* Vertical divider */}
+										<div className="w-px shrink-0 bg-border" />
+
+										{/* Right panel (desktop) */}
+										<div className="flex-[2] min-w-0 overflow-hidden bg-background flex flex-col">
+											{searchOpen && (
+												<>
+													<div className="shrink-0 max-h-[50%] overflow-hidden border-b">
+														<SearchPanel onClose={() => setSearchOpen(false)} />
+													</div>
+												</>
+											)}
+											<div className="flex-1 min-h-0 overflow-hidden">
+												<TreePanel />
 											</div>
-										</>
-									))}
+										</div>
+									</>
+								)}
 							</div>
 						</SidebarInset>
 					</div>

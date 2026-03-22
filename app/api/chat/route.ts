@@ -7,23 +7,8 @@ import {
 	type UIMessage,
 } from "ai";
 import { estimateTokens, getMaxTokens } from "@/lib/token-counter";
-
-const usingOpenRouter = !!process.env.OPENROUTER_API_KEY;
-
-const provider = usingOpenRouter
-	? createOpenAI({
-			baseURL: "https://openrouter.ai/api/v1",
-			apiKey: process.env.OPENROUTER_API_KEY,
-		})
-	: createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-const defaultModelId = usingOpenRouter
-	? (process.env.OPENROUTER_MODEL ?? "openai/gpt-4o-mini")
-	: (process.env.OPENAI_MODEL ?? "gpt-4o-mini");
-
-function createModel(modelId: string) {
-	return usingOpenRouter ? provider.chat(modelId) : provider.responses(modelId);
-}
+import { getSession } from "@/lib/session";
+import { getUserApiKey } from "@/lib/api-key-persistence";
 
 const SYSTEM_PROMPT =
 	"You are a helpful assistant. Be concise and accurate in your responses.";
@@ -38,6 +23,44 @@ export async function POST(req: Request) {
 		tools?: Record<string, { description?: string; parameters: JSONSchema7 }>;
 		model?: string;
 	} = await req.json();
+
+	// Check for user-specific API keys
+	const sessionData = await getSession();
+	let userOpenRouterKey: string | null = null;
+	let userOpenAIKey: string | null = null;
+
+	if (sessionData) {
+		userOpenRouterKey = await getUserApiKey(
+			sessionData.userId,
+			"openrouter",
+		);
+		userOpenAIKey = await getUserApiKey(sessionData.userId, "openai");
+	}
+
+	// Determine which provider/key to use
+	// Priority: user key > env var
+	const openRouterKey =
+		userOpenRouterKey ?? process.env.OPENROUTER_API_KEY ?? null;
+	const openAIKey = userOpenAIKey ?? process.env.OPENAI_API_KEY ?? null;
+
+	const useOpenRouter = !!openRouterKey;
+
+	const provider = useOpenRouter
+		? createOpenAI({
+				baseURL: "https://openrouter.ai/api/v1",
+				apiKey: openRouterKey!,
+			})
+		: createOpenAI({ apiKey: openAIKey! });
+
+	const defaultModelId = useOpenRouter
+		? (process.env.OPENROUTER_MODEL ?? "openai/gpt-4o-mini")
+		: (process.env.OPENAI_MODEL ?? "gpt-4o-mini");
+
+	function createModel(modelId: string) {
+		return useOpenRouter
+			? provider.chat(modelId)
+			: provider.responses(modelId);
+	}
 
 	const modelId = requestedModel || defaultModelId;
 	const model = createModel(modelId);
@@ -86,7 +109,7 @@ export async function POST(req: Request) {
 		tools: {
 			...frontendTools(tools ?? {}),
 		},
-		...(!usingOpenRouter && {
+		...(!useOpenRouter && {
 			providerOptions: {
 				openai: {
 					reasoningEffort: "low",
