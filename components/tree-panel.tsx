@@ -16,7 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "@xyflow/react/dist/style.css";
 import type { ThreadMessage } from "@assistant-ui/core";
 import { useThreadRuntime } from "@assistant-ui/react";
-import { GitFork, Settings2, Tag } from "lucide-react";
+import { GitFork } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -46,10 +46,10 @@ type TreeNodeData = {
 	metadata?: NodeMetadata;
 };
 
-const NODE_W = 240;
-const NODE_H = 84;
-const GAP_X = 40;
-const GAP_Y = 100;
+const NODE_W = 24;
+const NODE_H = 24;
+const GAP_X = 20;
+const GAP_Y = 24;
 
 function layoutTree(
 	nodes: TreeNodeData[],
@@ -163,161 +163,44 @@ const ROLE_STYLES: Record<
 
 // ---------- Custom Node Component (defined outside TreePanel for stable reference) ----------
 
-function formatModelId(modelId: string): string {
-	// Strip provider prefix for display (e.g. "openai/gpt-4o-mini" -> "gpt-4o-mini")
-	const parts = modelId.split("/");
-	return parts.length > 1 ? parts[parts.length - 1] : modelId;
-}
-
 function TreeNode({ data }: NodeProps) {
 	const roleStyle = ROLE_STYLES[data.role as string] ?? ROLE_STYLES.system;
-	const metadata = data.metadata as NodeMetadata | undefined;
-	const branchLabel = data.branchLabel as string | undefined;
+	const content = data.label as string;
 
 	return (
-		<div className="group relative">
+		<div className="group relative" title={content}>
 			<Handle
 				type="target"
 				position={Position.Top}
 				className="!bg-transparent !border-0 !w-0 !h-0"
 			/>
-			{/* Branch label tag */}
-			{branchLabel && (
-				<div
-					className="absolute -top-5 left-0 right-0 flex justify-center pointer-events-none"
-					style={{ zIndex: 10 }}
-				>
-					<span
-						className="inline-flex items-center rounded-full px-2 py-px text-[9px] font-medium truncate max-w-[220px]"
-						style={{
-							background: "rgba(139, 92, 246, 0.25)",
-							color: "#c4b5fd",
-							border: "1px solid rgba(139, 92, 246, 0.4)",
-						}}
-						title={branchLabel}
-					>
-						{branchLabel}
-					</span>
-				</div>
-			)}
-			<div className="text-[11px] leading-snug">
-				<div
-					className="text-[9px] uppercase tracking-wider mb-0.5 font-semibold"
-					style={{ color: roleStyle.border, opacity: 0.85 }}
-				>
-					{roleStyle.label}
-				</div>
-				<div className="line-clamp-2" style={{ color: "#e2e8f0" }}>
-					{data.label as string}
-				</div>
-				{metadata && (metadata.modelId || metadata.usage) && (
-					<div
-						className="mt-1 flex flex-wrap items-center gap-1.5"
-						style={{ fontSize: 9 }}
-					>
-						{metadata.modelId && (
-							<span
-								className="inline-flex items-center rounded px-1 py-px"
-								style={{
-									background: "rgba(255, 255, 255, 0.08)",
-									color: "rgba(148, 163, 184, 0.9)",
-									border: "1px solid rgba(148, 163, 184, 0.15)",
-								}}
-								title={`Model: ${metadata.modelId}`}
-							>
-								{formatModelId(metadata.modelId)}
-							</span>
-						)}
-						{metadata.usage && (
-							<span
-								style={{ color: "rgba(148, 163, 184, 0.65)" }}
-								title={`Prompt: ${metadata.usage.promptTokens ?? "?"} tokens, Completion: ${metadata.usage.completionTokens ?? "?"} tokens`}
-							>
-								{metadata.usage.completionTokens != null
-									? `${metadata.usage.completionTokens} tok`
-									: null}
-							</span>
-						)}
-					</div>
-				)}
-			</div>
-			{/* Action buttons - appear on hover */}
-			<div className="absolute -right-1 -bottom-1 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-				{/* Label button */}
-				<button
-					type="button"
-					className="rounded-full p-1 shadow-sm"
-					style={{
-						background: "rgba(30, 30, 46, 0.95)",
-						border: "1px solid rgba(148, 163, 184, 0.3)",
-					}}
-					onClick={(e) => {
-						e.stopPropagation();
-						(data.onLabel as ((nodeId: string) => void) | undefined)?.(
-							data.nodeId as string,
-						);
-					}}
-					title="Name this branch"
-				>
-					<Tag size={12} style={{ color: "#94a3b8" }} />
-				</button>
-				{/* System prompt button */}
-				<button
-					type="button"
-					className="rounded-full p-1 shadow-sm"
-					style={{
-						background: "rgba(30, 30, 46, 0.95)",
-						border: "1px solid rgba(148, 163, 184, 0.3)",
-					}}
-					onClick={(e) => {
-						e.stopPropagation();
-						(data.onInsertSystem as ((nodeId: string) => void) | undefined)?.(
-							data.nodeId as string,
-						);
-					}}
-					title="Insert system prompt"
-				>
-					<Settings2 size={12} style={{ color: "#94a3b8" }} />
-				</button>
-				{/* Fork button */}
-				<button
-					type="button"
-					className="rounded-full p-1 shadow-sm"
-					style={{
-						background: "rgba(30, 30, 46, 0.95)",
-						border: "1px solid rgba(148, 163, 184, 0.3)",
-					}}
-					onClick={(e) => {
-						e.stopPropagation();
-						(data.onFork as ((nodeId: string) => void) | undefined)?.(
-							data.nodeId as string,
-						);
-					}}
-					title="Fork from here"
-				>
-					<svg
-						role="img"
-						aria-label="Fork"
-						xmlns="http://www.w3.org/2000/svg"
-						width="12"
-						height="12"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						strokeWidth="2"
-						strokeLinecap="round"
-						strokeLinejoin="round"
-						style={{ color: "#94a3b8" }}
-					>
-						<title>Fork</title>
-						<circle cx="12" cy="18" r="3" />
-						<circle cx="6" cy="6" r="3" />
-						<circle cx="18" cy="6" r="3" />
-						<path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9" />
-						<path d="M12 12v3" />
-					</svg>
-				</button>
-			</div>
+			<div
+				className="rounded-full"
+				style={{
+					width: 16,
+					height: 16,
+					background: roleStyle.border,
+					margin: 4,
+				}}
+			/>
+			{/* Fork button — appears on hover */}
+			<button
+				type="button"
+				className="absolute -right-3 -top-3 opacity-0 group-hover:opacity-100 transition-opacity rounded-full p-0.5 shadow-sm"
+				style={{
+					background: "rgba(30, 30, 46, 0.95)",
+					border: "1px solid rgba(148, 163, 184, 0.3)",
+				}}
+				onClick={(e) => {
+					e.stopPropagation();
+					(data.onFork as ((nodeId: string) => void) | undefined)?.(
+						data.nodeId as string,
+					);
+				}}
+				title="Fork from here"
+			>
+				<GitFork size={10} style={{ color: "#94a3b8" }} />
+			</button>
 			<Handle
 				type="source"
 				position={Position.Bottom}
@@ -521,20 +404,13 @@ export function TreePanel() {
 				},
 				style: {
 					width: NODE_W,
-					fontSize: 11,
-					background: style.bg,
-					border: `1.5px solid ${style.border}`,
-					borderRadius: 10,
-					color: "#e2e8f0",
-					padding: "8px 12px",
-					opacity: n.isActive ? 1 : 0.5,
-					boxShadow: n.isHead
-						? "0 0 0 2px rgba(96, 165, 250, 0.6)"
-						: n.isActive
-							? "0 0 0 2px rgba(255, 255, 255, 0.15)"
-							: "none",
+					height: NODE_H,
+					background: "transparent",
+					border: "none",
+					padding: 0,
+					opacity: n.isActive ? 1 : 0.4,
 					cursor: "pointer",
-					transition: "opacity 0.2s, box-shadow 0.2s",
+					transition: "opacity 0.2s",
 				},
 			};
 		});
@@ -583,17 +459,20 @@ export function TreePanel() {
 		[threadRuntime],
 	);
 
-	// Fit view only when the number of nodes changes (not on every token)
+	// Fit view when the tree structure changes (node count or active branch)
+	const treeFingerprint = `${flowNodes.length}:${treeData.headId}`;
 	useEffect(() => {
-		if (flowNodes.length !== prevNodeCount.current && flowNodes.length > 0) {
+		if (
+			treeFingerprint !== prevNodeCount.current.toString() &&
+			flowNodes.length > 0
+		) {
 			prevNodeCount.current = flowNodes.length;
-			// Small delay to let ReactFlow process the new nodes
 			const timer = setTimeout(() => {
-				rfInstance.current?.fitView({ padding: 0.3 });
+				rfInstance.current?.fitView({ padding: 0.15, duration: 300 });
 			}, 50);
 			return () => clearTimeout(timer);
 		}
-	}, [flowNodes.length]);
+	}, [treeFingerprint, flowNodes.length]);
 
 	// Empty state
 	if (flowNodes.length === 0) {
@@ -621,8 +500,8 @@ export function TreePanel() {
 				nodesDraggable={false}
 				nodesConnectable={false}
 				elementsSelectable={false}
-				minZoom={0.2}
-				maxZoom={2}
+				minZoom={0.05}
+				maxZoom={3}
 				proOptions={{ hideAttribution: true }}
 			>
 				<Background color="#313244" gap={24} />
