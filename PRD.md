@@ -180,4 +180,4 @@ Table node_metadata {
 - **Spatial memory over scroll**: the mindmap gives conversations a physical location the user can learn and return to, rather than relying on scroll position.
 - **Minimal chrome**: the input area stays clean; metadata and settings are secondary surfaces.
 - **No surprises on context**: the user should always be able to see exactly what the model will receive before hitting send.
-- **Forking is cheap**: the action to branch should feel as lightweight as sending a message, not like a modal workflow.
+- **Forking is cheap**: the action to branch should feel as lightweight as sending a message, not like a modal workflow
