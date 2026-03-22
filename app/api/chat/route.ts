@@ -7,10 +7,10 @@ import {
 	type UIMessage,
 } from "ai";
 import { headers } from "next/headers";
-import { estimateTokens, getMaxTokens } from "@/lib/token-counter";
-import { getSession } from "@/lib/session";
 import { getUserApiKey } from "@/lib/api-key-persistence";
 import { rateLimit } from "@/lib/rate-limit";
+import { getSession } from "@/lib/session";
+import { estimateTokens, getMaxTokens } from "@/lib/token-counter";
 
 const SYSTEM_PROMPT =
 	"You are a helpful assistant. Be concise and accurate in your responses.";
@@ -18,9 +18,10 @@ const SYSTEM_PROMPT =
 export async function POST(req: Request) {
 	// --- Rate limiting ---
 	const headersList = await headers();
-	const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim()
-		?? headersList.get("x-real-ip")
-		?? "unknown";
+	const ip =
+		headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+		headersList.get("x-real-ip") ??
+		"unknown";
 	const { allowed } = rateLimit(ip);
 	if (!allowed) {
 		return new Response(
@@ -49,7 +50,10 @@ export async function POST(req: Request) {
 	} = await req.json();
 
 	// --- Model ID validation ---
-	if (requestedModel && (requestedModel.length > 100 || !/^[a-zA-Z0-9\-_./]+$/.test(requestedModel))) {
+	if (
+		requestedModel &&
+		(requestedModel.length > 100 || !/^[a-zA-Z0-9\-_./]+$/.test(requestedModel))
+	) {
 		return new Response(JSON.stringify({ error: "Invalid model ID" }), {
 			status: 400,
 			headers: { "Content-Type": "application/json" },
@@ -60,10 +64,7 @@ export async function POST(req: Request) {
 	let userOpenRouterKey: string | null = null;
 	let userOpenAIKey: string | null = null;
 
-	userOpenRouterKey = await getUserApiKey(
-		sessionData.userId,
-		"openrouter",
-	);
+	userOpenRouterKey = await getUserApiKey(sessionData.userId, "openrouter");
 	userOpenAIKey = await getUserApiKey(sessionData.userId, "openai");
 
 	// Determine which provider/key to use
@@ -81,22 +82,21 @@ export async function POST(req: Request) {
 	}
 
 	const useOpenRouter = !!openRouterKey;
+	const activeKey = (useOpenRouter ? openRouterKey : openAIKey) as string;
 
 	const provider = useOpenRouter
 		? createOpenAI({
 				baseURL: "https://openrouter.ai/api/v1",
-				apiKey: openRouterKey!,
+				apiKey: activeKey,
 			})
-		: createOpenAI({ apiKey: openAIKey! });
+		: createOpenAI({ apiKey: activeKey });
 
 	const defaultModelId = useOpenRouter
 		? (process.env.OPENROUTER_MODEL ?? "openai/gpt-4o-mini")
 		: (process.env.OPENAI_MODEL ?? "gpt-4o-mini");
 
 	function createModel(modelId: string) {
-		return useOpenRouter
-			? provider.chat(modelId)
-			: provider.responses(modelId);
+		return useOpenRouter ? provider.chat(modelId) : provider.responses(modelId);
 	}
 
 	const modelId = requestedModel || defaultModelId;

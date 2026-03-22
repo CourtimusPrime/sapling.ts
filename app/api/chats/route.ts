@@ -52,7 +52,7 @@ export async function POST(req: Request) {
 			return NextResponse.json({ error: titleError }, { status: 400 });
 		}
 
-		await createChat(id!, title, sessionData.userId);
+		await createChat(id as string, title, sessionData.userId);
 
 		return NextResponse.json({ id, title: title ?? null }, { status: 201 });
 	} catch (error) {

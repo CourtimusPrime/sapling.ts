@@ -1,20 +1,19 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/session";
 import {
-	getUserApiKeys,
-	saveUserApiKey,
 	deleteUserApiKey,
+	getUserApiKeys,
 	maskApiKey,
+	saveUserApiKey,
 } from "@/lib/api-key-persistence";
 import { decryptApiKey } from "@/lib/auth";
+import { getSession } from "@/lib/session";
 
 const VALID_PROVIDERS = ["openrouter", "openai"] as const;
 type Provider = (typeof VALID_PROVIDERS)[number];
 
 function isValidProvider(value: unknown): value is Provider {
 	return (
-		typeof value === "string" &&
-		VALID_PROVIDERS.includes(value as Provider)
+		typeof value === "string" && VALID_PROVIDERS.includes(value as Provider)
 	);
 }
 

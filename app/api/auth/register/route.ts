@@ -15,9 +15,10 @@ export async function POST(req: Request) {
 	try {
 		// --- Rate limiting ---
 		const headersList = await headers();
-		const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim()
-			?? headersList.get("x-real-ip")
-			?? "unknown";
+		const ip =
+			headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+			headersList.get("x-real-ip") ??
+			"unknown";
 		const { allowed } = rateLimit(ip);
 		if (!allowed) {
 			return NextResponse.json(

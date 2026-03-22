@@ -84,7 +84,12 @@ function layoutTree(
 
 	const positions = new Map<string, { x: number; y: number }>();
 
-	function place(id: string, x: number, y: number, visited = new Set<string>()) {
+	function place(
+		id: string,
+		x: number,
+		y: number,
+		visited = new Set<string>(),
+	) {
 		if (visited.has(id)) return; // cycle detected
 		visited.add(id);
 		positions.set(id, { x, y });

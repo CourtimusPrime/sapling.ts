@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { ArrowLeft, Check, Loader2, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -145,9 +145,8 @@ export default function SettingsPage() {
 				</Link>
 				<h1 className="mt-4 font-semibold text-2xl">Settings</h1>
 				<p className="mt-1 text-muted-foreground text-sm">
-					Manage your API keys. Your keys are encrypted and stored
-					securely. User-provided keys take priority over server
-					defaults.
+					Manage your API keys. Your keys are encrypted and stored securely.
+					User-provided keys take priority over server defaults.
 				</p>
 			</div>
 
@@ -165,14 +164,9 @@ export default function SettingsPage() {
 						const fb = feedback[provider.id];
 
 						return (
-							<section
-								key={provider.id}
-								className="rounded-lg border p-5"
-							>
+							<section key={provider.id} className="rounded-lg border p-5">
 								<div className="mb-3 flex items-center justify-between">
-									<h2 className="font-medium text-lg">
-										{provider.label}
-									</h2>
+									<h2 className="font-medium text-lg">{provider.label}</h2>
 									{stored ? (
 										<span className="rounded-full bg-green-500/10 px-2.5 py-0.5 font-medium text-green-500 text-xs">
 											Active
@@ -192,9 +186,7 @@ export default function SettingsPage() {
 										<Button
 											variant="ghost"
 											size="icon-xs"
-											onClick={() =>
-												handleDelete(provider.id)
-											}
+											onClick={() => handleDelete(provider.id)}
 											disabled={isDeleting}
 											aria-label={`Delete ${provider.label} key`}
 										>
@@ -229,13 +221,8 @@ export default function SettingsPage() {
 										}}
 									/>
 									<Button
-										onClick={() =>
-											handleSave(provider.id)
-										}
-										disabled={
-											isSaving ||
-											!inputValues[provider.id]?.trim()
-										}
+										onClick={() => handleSave(provider.id)}
+										disabled={isSaving || !inputValues[provider.id]?.trim()}
 										size="default"
 									>
 										{isSaving ? (
@@ -254,8 +241,7 @@ export default function SettingsPage() {
 												: "text-destructive"
 										}`}
 									>
-										{(fb === "saved" ||
-											fb === "deleted") && (
+										{(fb === "saved" || fb === "deleted") && (
 											<Check className="size-3" />
 										)}
 										{fb === "saved"

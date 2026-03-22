@@ -1,7 +1,7 @@
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { userApiKey } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
-import { encryptApiKey, decryptApiKey } from "./auth";
+import { decryptApiKey, encryptApiKey } from "./auth";
 
 export async function getUserApiKeys(userId: string) {
 	return db.select().from(userApiKey).where(eq(userApiKey.userId, userId));

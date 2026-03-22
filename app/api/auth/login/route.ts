@@ -13,9 +13,10 @@ export async function POST(req: Request) {
 	try {
 		// --- Rate limiting ---
 		const headersList = await headers();
-		const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim()
-			?? headersList.get("x-real-ip")
-			?? "unknown";
+		const ip =
+			headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+			headersList.get("x-real-ip") ??
+			"unknown";
 		const { allowed } = rateLimit(ip);
 		if (!allowed) {
 			return NextResponse.json(
@@ -36,7 +37,9 @@ export async function POST(req: Request) {
 
 		if (password.length > MAX_PASSWORD_LENGTH) {
 			return NextResponse.json(
-				{ error: `Password must be at most ${MAX_PASSWORD_LENGTH} characters.` },
+				{
+					error: `Password must be at most ${MAX_PASSWORD_LENGTH} characters.`,
+				},
 				{ status: 400 },
 			);
 		}

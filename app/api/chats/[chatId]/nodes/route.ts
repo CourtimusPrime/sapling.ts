@@ -106,18 +106,21 @@ export async function POST(
 		// Ensure the chat exists
 		await getOrCreateChat(chatId, undefined, sessionData.userId);
 
+		const validId = id as string;
+		const validContent = content as string;
+
 		await saveNode({
-			id: id!,
+			id: validId,
 			chatId,
 			parentId: parentId ?? null,
 			role: role as "user" | "assistant" | "system",
-			content: content!,
+			content: validContent,
 		});
 
 		// Save metadata if provided (typically for assistant messages)
 		if (metadata) {
 			await saveNodeMetadata({
-				nodeId: id!,
+				nodeId: validId,
 				...metadata,
 			});
 		}
