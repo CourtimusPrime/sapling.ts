@@ -85,9 +85,11 @@ function useChatThreadRuntime(): AssistantRuntime {
 
 	const runtime = useAISDKRuntime(chat);
 
-	if (transport instanceof AssistantChatTransport) {
-		transport.setRuntime(runtime);
-	}
+	useEffect(() => {
+		if (transport instanceof AssistantChatTransport) {
+			transport.setRuntime(runtime);
+		}
+	}, [transport, runtime]);
 
 	return runtime;
 }
@@ -95,6 +97,11 @@ function useChatThreadRuntime(): AssistantRuntime {
 function SyncProvider({ children }: { children: React.ReactNode }) {
 	useSync();
 	return <>{children}</>;
+}
+
+function ThreadTitle() {
+	const title = useAuiState((s) => s.threadListItem?.title);
+	return <BreadcrumbPage>{title || "New Chat"}</BreadcrumbPage>;
 }
 
 export const Assistant = () => {
@@ -117,7 +124,7 @@ export const Assistant = () => {
 
 	const handleTouchEnd = useCallback((e: React.TouchEvent) => {
 		const deltaX = e.changedTouches[0].clientX - touchStartX.current;
-		if (deltaX > 100) {
+		if (deltaX < -100) {
 			setTreePanelOpen(false);
 			setSearchOpen(false);
 		}
@@ -143,7 +150,7 @@ export const Assistant = () => {
 										</BreadcrumbItem>
 										<BreadcrumbSeparator className="hidden md:block" />
 										<BreadcrumbItem>
-											<BreadcrumbPage>New Chat</BreadcrumbPage>
+											<ThreadTitle />
 										</BreadcrumbItem>
 									</BreadcrumbList>
 								</Breadcrumb>
@@ -259,11 +266,9 @@ export const Assistant = () => {
 										{/* Right panel (desktop) */}
 										<div className="flex-[2] min-w-0 overflow-hidden bg-background flex flex-col">
 											{searchOpen && (
-												<>
-													<div className="shrink-0 max-h-[50%] overflow-hidden border-b">
-														<SearchPanel onClose={() => setSearchOpen(false)} />
-													</div>
-												</>
+												<div className="shrink-0 max-h-[50%] overflow-hidden border-b">
+													<SearchPanel onClose={() => setSearchOpen(false)} />
+												</div>
 											)}
 											<div className="flex-1 min-h-0 overflow-hidden">
 												<TreePanel />

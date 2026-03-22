@@ -1,15 +1,31 @@
 import { eq } from "drizzle-orm";
+import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { user } from "@/db/schema";
 import { generateUserId, hashPassword } from "@/lib/auth";
+import { rateLimit } from "@/lib/rate-limit";
 import { createSession, setSessionCookie } from "@/lib/session";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
+const MAX_PASSWORD_LENGTH = 128;
 
 export async function POST(req: Request) {
 	try {
+		// --- Rate limiting ---
+		const headersList = await headers();
+		const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim()
+			?? headersList.get("x-real-ip")
+			?? "unknown";
+		const { allowed } = rateLimit(ip);
+		if (!allowed) {
+			return NextResponse.json(
+				{ error: "Too many requests. Please try again later." },
+				{ status: 429 },
+			);
+		}
+
 		const body = await req.json();
 		const { email, password } = body as { email?: string; password?: string };
 
@@ -29,6 +45,15 @@ export async function POST(req: Request) {
 			return NextResponse.json(
 				{
 					error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
+				},
+				{ status: 400 },
+			);
+		}
+
+		if (password.length > MAX_PASSWORD_LENGTH) {
+			return NextResponse.json(
+				{
+					error: `Password must be at most ${MAX_PASSWORD_LENGTH} characters.`,
 				},
 				{ status: 400 },
 			);

@@ -63,14 +63,16 @@ function layoutTree(
 
 	const subtreeWidth = new Map<string, number>();
 
-	function calcWidth(id: string): number {
+	function calcWidth(id: string, visited = new Set<string>()): number {
+		if (visited.has(id)) return NODE_W; // cycle detected
+		visited.add(id);
 		const children = childMap.get(id) ?? [];
 		if (children.length === 0) {
 			subtreeWidth.set(id, NODE_W);
 			return NODE_W;
 		}
 		const total = children.reduce(
-			(sum, c) => sum + calcWidth(c.id) + GAP_X,
+			(sum, c) => sum + calcWidth(c.id, visited) + GAP_X,
 			-GAP_X,
 		);
 		subtreeWidth.set(id, total);
@@ -82,13 +84,15 @@ function layoutTree(
 
 	const positions = new Map<string, { x: number; y: number }>();
 
-	function place(id: string, x: number, y: number) {
+	function place(id: string, x: number, y: number, visited = new Set<string>()) {
+		if (visited.has(id)) return; // cycle detected
+		visited.add(id);
 		positions.set(id, { x, y });
 		const children = childMap.get(id) ?? [];
 		let cursor = x - (subtreeWidth.get(id)! - NODE_W) / 2;
 		for (const child of children) {
 			const cw = subtreeWidth.get(child.id)!;
-			place(child.id, cursor + (cw - NODE_W) / 2, y + NODE_H + GAP_Y);
+			place(child.id, cursor + (cw - NODE_W) / 2, y + NODE_H + GAP_Y, visited);
 			cursor += cw + GAP_X;
 		}
 	}
@@ -382,6 +386,7 @@ export function TreePanel() {
 
 		let current: string | null = treeData.headId;
 		while (current) {
+			if (ids.has(current)) break; // cycle detected
 			ids.add(current);
 			current = parentMap.get(current) ?? null;
 		}

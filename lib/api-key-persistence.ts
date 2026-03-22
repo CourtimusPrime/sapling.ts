@@ -20,7 +20,11 @@ export async function getUserApiKey(
 		.limit(1);
 
 	if (!rows[0]) return null;
-	return decryptApiKey(rows[0].encryptedKey);
+	try {
+		return decryptApiKey(rows[0].encryptedKey);
+	} catch {
+		return null; // Corrupted or re-keyed — treat as missing
+	}
 }
 
 export async function saveUserApiKey(

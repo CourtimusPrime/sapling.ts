@@ -6,14 +6,38 @@ import {
 	streamText,
 	type UIMessage,
 } from "ai";
+import { headers } from "next/headers";
 import { estimateTokens, getMaxTokens } from "@/lib/token-counter";
 import { getSession } from "@/lib/session";
 import { getUserApiKey } from "@/lib/api-key-persistence";
+import { rateLimit } from "@/lib/rate-limit";
 
 const SYSTEM_PROMPT =
 	"You are a helpful assistant. Be concise and accurate in your responses.";
 
 export async function POST(req: Request) {
+	// --- Rate limiting ---
+	const headersList = await headers();
+	const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim()
+		?? headersList.get("x-real-ip")
+		?? "unknown";
+	const { allowed } = rateLimit(ip);
+	if (!allowed) {
+		return new Response(
+			JSON.stringify({ error: "Too many requests. Please try again later." }),
+			{ status: 429, headers: { "Content-Type": "application/json" } },
+		);
+	}
+
+	// --- Auth check ---
+	const sessionData = await getSession();
+	if (!sessionData) {
+		return new Response(JSON.stringify({ error: "Unauthorized" }), {
+			status: 401,
+			headers: { "Content-Type": "application/json" },
+		});
+	}
+
 	const {
 		messages,
 		tools,
@@ -24,24 +48,37 @@ export async function POST(req: Request) {
 		model?: string;
 	} = await req.json();
 
+	// --- Model ID validation ---
+	if (requestedModel && (requestedModel.length > 100 || !/^[a-zA-Z0-9\-_./]+$/.test(requestedModel))) {
+		return new Response(JSON.stringify({ error: "Invalid model ID" }), {
+			status: 400,
+			headers: { "Content-Type": "application/json" },
+		});
+	}
+
 	// Check for user-specific API keys
-	const sessionData = await getSession();
 	let userOpenRouterKey: string | null = null;
 	let userOpenAIKey: string | null = null;
 
-	if (sessionData) {
-		userOpenRouterKey = await getUserApiKey(
-			sessionData.userId,
-			"openrouter",
-		);
-		userOpenAIKey = await getUserApiKey(sessionData.userId, "openai");
-	}
+	userOpenRouterKey = await getUserApiKey(
+		sessionData.userId,
+		"openrouter",
+	);
+	userOpenAIKey = await getUserApiKey(sessionData.userId, "openai");
 
 	// Determine which provider/key to use
 	// Priority: user key > env var
 	const openRouterKey =
 		userOpenRouterKey ?? process.env.OPENROUTER_API_KEY ?? null;
 	const openAIKey = userOpenAIKey ?? process.env.OPENAI_API_KEY ?? null;
+
+	// --- API key guard ---
+	if (!openRouterKey && !openAIKey) {
+		return new Response(
+			JSON.stringify({ error: "No API key configured. Add one in Settings." }),
+			{ status: 503, headers: { "Content-Type": "application/json" } },
+		);
+	}
 
 	const useOpenRouter = !!openRouterKey;
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { deleteChat, getChat, updateChatTitle } from "@/lib/chat-persistence";
+import { getSession } from "@/lib/session";
 import { validateOptionalString, MAX_TITLE_LENGTH } from "@/lib/validation";
 
 /**
@@ -10,11 +11,21 @@ export async function GET(
 	{ params }: { params: Promise<{ chatId: string }> },
 ) {
 	try {
+		const sessionData = await getSession();
+		if (!sessionData) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
 		const { chatId } = await params;
 		const chatRecord = await getChat(chatId);
 
 		if (!chatRecord) {
 			return NextResponse.json({ error: "Chat not found" }, { status: 404 });
+		}
+
+		// Ownership check: chat must belong to this user (or have no user - legacy)
+		if (chatRecord.userId && chatRecord.userId !== sessionData.userId) {
+			return NextResponse.json({ error: "Not found" }, { status: 404 });
 		}
 
 		return NextResponse.json(chatRecord);
@@ -36,6 +47,11 @@ export async function PATCH(
 	{ params }: { params: Promise<{ chatId: string }> },
 ) {
 	try {
+		const sessionData = await getSession();
+		if (!sessionData) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
 		const { chatId } = await params;
 		const body = await req.json();
 
@@ -47,6 +63,11 @@ export async function PATCH(
 		const chatRecord = await getChat(chatId);
 		if (!chatRecord) {
 			return NextResponse.json({ error: "Chat not found" }, { status: 404 });
+		}
+
+		// Ownership check: chat must belong to this user (or have no user - legacy)
+		if (chatRecord.userId && chatRecord.userId !== sessionData.userId) {
+			return NextResponse.json({ error: "Not found" }, { status: 404 });
 		}
 
 		// Handle explicit title update
@@ -85,7 +106,22 @@ export async function DELETE(
 	{ params }: { params: Promise<{ chatId: string }> },
 ) {
 	try {
+		const sessionData = await getSession();
+		if (!sessionData) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
 		const { chatId } = await params;
+		const chatRecord = await getChat(chatId);
+		if (!chatRecord) {
+			return NextResponse.json({ error: "Chat not found" }, { status: 404 });
+		}
+
+		// Ownership check: chat must belong to this user (or have no user - legacy)
+		if (chatRecord.userId && chatRecord.userId !== sessionData.userId) {
+			return NextResponse.json({ error: "Not found" }, { status: 404 });
+		}
+
 		await deleteChat(chatId);
 		return NextResponse.json({ success: true });
 	} catch (error) {

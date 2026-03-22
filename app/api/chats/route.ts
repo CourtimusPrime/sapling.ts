@@ -13,8 +13,11 @@ import {
  */
 export async function GET() {
 	try {
-		const session = await getSession();
-		const chats = await listChats(session?.userId);
+		const sessionData = await getSession();
+		if (!sessionData) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+		const chats = await listChats(sessionData.userId);
 		return NextResponse.json(chats);
 	} catch (error) {
 		console.error("[GET /api/chats] Error:", error);
@@ -31,6 +34,11 @@ export async function GET() {
  */
 export async function POST(req: Request) {
 	try {
+		const sessionData = await getSession();
+		if (!sessionData) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
 		const body = await req.json();
 		const { id, title } = body as { id?: string; title?: string };
 
@@ -44,8 +52,7 @@ export async function POST(req: Request) {
 			return NextResponse.json({ error: titleError }, { status: 400 });
 		}
 
-		const session = await getSession();
-		await createChat(id!, title, session?.userId);
+		await createChat(id!, title, sessionData.userId);
 
 		return NextResponse.json({ id, title: title ?? null }, { status: 201 });
 	} catch (error) {

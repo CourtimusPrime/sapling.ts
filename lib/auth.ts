@@ -18,7 +18,9 @@ export function hashPassword(password: string): string {
 
 /** Verify a password against a stored salt:hash string. */
 export function verifyPassword(password: string, storedHash: string): boolean {
-	const [salt, hash] = storedHash.split(":");
+	const parts = storedHash.split(":");
+	if (parts.length !== 2 || !parts[0] || !parts[1]) return false;
+	const [salt, hash] = parts;
 	const hashBuffer = Buffer.from(hash, "hex");
 	const testBuffer = scryptSync(password, salt, KEY_LENGTH);
 	return timingSafeEqual(hashBuffer, testBuffer);
@@ -38,11 +40,20 @@ export function generateUserId(): string {
 // API key encryption (AES-256-GCM)
 // ---------------------------------------------------------------------------
 
-const ENCRYPTION_KEY =
-	process.env.ENCRYPTION_KEY || "default-dev-key-change-in-production!!";
+const effectiveEncryptionKey =
+	process.env.ENCRYPTION_KEY ?? "dev-only-not-for-production";
 
 function deriveEncryptionKey(): Buffer {
-	return scryptSync(ENCRYPTION_KEY, "sapling-salt", 32);
+	if (
+		!process.env.ENCRYPTION_KEY &&
+		process.env.NODE_ENV === "production" &&
+		typeof window === "undefined"
+	) {
+		throw new Error(
+			"ENCRYPTION_KEY environment variable is required in production",
+		);
+	}
+	return scryptSync(effectiveEncryptionKey, "sapling-salt", 32);
 }
 
 /** Encrypt an API key for storage. Returns iv:tag:ciphertext in hex. */

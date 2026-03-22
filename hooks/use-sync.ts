@@ -5,16 +5,23 @@ import { useThreadRuntime } from "@assistant-ui/react";
 export function useSync() {
   const runtime = useThreadRuntime();
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastSyncedCountRef = useRef(0);
+  const lastSyncedRef = useRef("");
 
   useEffect(() => {
     const sync = () => {
       try {
         const exported = runtime.export();
         if (!exported.messages.length) return;
-        if (exported.messages.length === lastSyncedCountRef.current) return;
 
-        lastSyncedCountRef.current = exported.messages.length;
+        const fingerprint = exported.messages
+          .map(({ message }) => {
+            const text = message.content.find((p: { type: string }) => p.type === "text") as { type: "text"; text: string } | undefined;
+            return `${message.id}:${text?.text.length ?? 0}`;
+          })
+          .join("|");
+
+        if (fingerprint === lastSyncedRef.current) return;
+        lastSyncedRef.current = fingerprint;
 
         // Use the first message ID as chatId (stable across the thread's lifetime)
         const chatId = exported.messages[0].message.id;

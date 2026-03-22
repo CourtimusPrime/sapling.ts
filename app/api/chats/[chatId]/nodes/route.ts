@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+	getChat,
 	getChatNodesWithMetadata,
 	getOrCreateChat,
 	saveNode,
@@ -22,7 +23,23 @@ export async function GET(
 	{ params }: { params: Promise<{ chatId: string }> },
 ) {
 	try {
+		const sessionData = await getSession();
+		if (!sessionData) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
 		const { chatId } = await params;
+
+		const chatRecord = await getChat(chatId);
+		if (!chatRecord) {
+			return NextResponse.json({ error: "Chat not found" }, { status: 404 });
+		}
+
+		// Ownership check: chat must belong to this user (or have no user - legacy)
+		if (chatRecord.userId && chatRecord.userId !== sessionData.userId) {
+			return NextResponse.json({ error: "Not found" }, { status: 404 });
+		}
+
 		const nodes = await getChatNodesWithMetadata(chatId);
 		return NextResponse.json(nodes);
 	} catch (error) {
@@ -42,7 +59,21 @@ export async function POST(
 	{ params }: { params: Promise<{ chatId: string }> },
 ) {
 	try {
+		const sessionData = await getSession();
+		if (!sessionData) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
 		const { chatId } = await params;
+
+		const chatRecord = await getChat(chatId);
+		if (chatRecord) {
+			// Ownership check: chat must belong to this user (or have no user - legacy)
+			if (chatRecord.userId && chatRecord.userId !== sessionData.userId) {
+				return NextResponse.json({ error: "Not found" }, { status: 404 });
+			}
+		}
+
 		const body = await req.json();
 		const { id, parentId, role, content, metadata } = body as {
 			id?: string;
@@ -73,8 +104,7 @@ export async function POST(
 		}
 
 		// Ensure the chat exists
-		const session = await getSession();
-		await getOrCreateChat(chatId, undefined, session?.userId);
+		await getOrCreateChat(chatId, undefined, sessionData.userId);
 
 		await saveNode({
 			id: id!,
