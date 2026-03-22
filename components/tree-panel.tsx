@@ -5,17 +5,25 @@ import {
   ReactFlow,
   Background,
   Controls,
+  Handle,
+  Position,
   type Node,
   type Edge,
   type NodeMouseHandler,
   type ReactFlowInstance,
+  type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useThreadRuntime } from "@assistant-ui/react";
 import type { ThreadMessage } from "@assistant-ui/core";
 import { GitFork } from "lucide-react";
 
-// ---------- Layout algorithm (adapted from app/tree/tree-view.tsx) ----------
+// ---------- Layout algorithm ----------
+
+type NodeMetadata = {
+  modelId?: string;
+  usage?: { promptTokens?: number; completionTokens?: number };
+};
 
 type TreeNodeData = {
   id: string;
@@ -24,10 +32,11 @@ type TreeNodeData = {
   content: string;
   isActive: boolean;
   isHead: boolean;
+  metadata?: NodeMetadata;
 };
 
 const NODE_W = 240;
-const NODE_H = 72;
+const NODE_H = 84;
 const GAP_X = 40;
 const GAP_Y = 100;
 
@@ -94,6 +103,23 @@ function extractTextContent(message: ThreadMessage): string {
   return "(empty)";
 }
 
+function extractMetadata(message: ThreadMessage): NodeMetadata | undefined {
+  if (message.role !== "assistant") return undefined;
+
+  const custom = message.metadata?.custom as
+    | Record<string, unknown>
+    | undefined;
+  if (!custom) return undefined;
+
+  const modelId = custom.modelId as string | undefined;
+  const usage = custom.usage as
+    | { promptTokens?: number; completionTokens?: number }
+    | undefined;
+
+  if (!modelId && !usage) return undefined;
+  return { modelId, usage };
+}
+
 const ROLE_STYLES: Record<
   string,
   { bg: string; border: string; label: string }
@@ -114,6 +140,111 @@ const ROLE_STYLES: Record<
     label: "System",
   },
 };
+
+// ---------- Custom Node Component (defined outside TreePanel for stable reference) ----------
+
+function formatModelId(modelId: string): string {
+  // Strip provider prefix for display (e.g. "openai/gpt-4o-mini" -> "gpt-4o-mini")
+  const parts = modelId.split("/");
+  return parts.length > 1 ? parts[parts.length - 1] : modelId;
+}
+
+function TreeNode({ data }: NodeProps) {
+  const roleStyle = ROLE_STYLES[data.role as string] ?? ROLE_STYLES.system;
+  const metadata = data.metadata as NodeMetadata | undefined;
+
+  return (
+    <div className="group relative">
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="!bg-transparent !border-0 !w-0 !h-0"
+      />
+      <div className="text-[11px] leading-snug">
+        <div
+          className="text-[9px] uppercase tracking-wider mb-0.5 font-semibold"
+          style={{ color: roleStyle.border, opacity: 0.85 }}
+        >
+          {roleStyle.label}
+        </div>
+        <div className="line-clamp-2" style={{ color: "#e2e8f0" }}>
+          {data.label as string}
+        </div>
+        {metadata && (metadata.modelId || metadata.usage) && (
+          <div
+            className="mt-1 flex flex-wrap items-center gap-1.5"
+            style={{ fontSize: 9 }}
+          >
+            {metadata.modelId && (
+              <span
+                className="inline-flex items-center rounded px-1 py-px"
+                style={{
+                  background: "rgba(255, 255, 255, 0.08)",
+                  color: "rgba(148, 163, 184, 0.9)",
+                  border: "1px solid rgba(148, 163, 184, 0.15)",
+                }}
+                title={`Model: ${metadata.modelId}`}
+              >
+                {formatModelId(metadata.modelId)}
+              </span>
+            )}
+            {metadata.usage && (
+              <span
+                style={{ color: "rgba(148, 163, 184, 0.65)" }}
+                title={`Prompt: ${metadata.usage.promptTokens ?? "?"} tokens, Completion: ${metadata.usage.completionTokens ?? "?"} tokens`}
+              >
+                {metadata.usage.completionTokens != null
+                  ? `${metadata.usage.completionTokens} tok`
+                  : null}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+      {/* Fork button - appears on hover */}
+      <button
+        className="absolute -right-1 -bottom-1 opacity-0 group-hover:opacity-100 transition-opacity rounded-full p-1 shadow-sm"
+        style={{
+          background: "rgba(30, 30, 46, 0.95)",
+          border: "1px solid rgba(148, 163, 184, 0.3)",
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          (data.onFork as ((nodeId: string) => void) | undefined)?.(
+            data.nodeId as string,
+          );
+        }}
+        title="Fork from here"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ color: "#94a3b8" }}
+        >
+          <circle cx="12" cy="18" r="3" />
+          <circle cx="6" cy="6" r="3" />
+          <circle cx="18" cy="6" r="3" />
+          <path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9" />
+          <path d="M12 12v3" />
+        </svg>
+      </button>
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="!bg-transparent !border-0 !w-0 !h-0"
+      />
+    </div>
+  );
+}
+
+const nodeTypes = { treeNode: TreeNode };
 
 // ---------- Component ----------
 
@@ -164,6 +295,19 @@ export function TreePanel() {
     return ids;
   }, [treeData]);
 
+  // Fork handler: navigate to the clicked node so the next user message branches from there
+  const handleFork = useCallback(
+    (nodeId: string) => {
+      try {
+        const exported = threadRuntime.export();
+        threadRuntime.import({ ...exported, headId: nodeId });
+      } catch {
+        // Runtime may not be ready
+      }
+    },
+    [threadRuntime],
+  );
+
   // Build tree nodes and flow data
   const { flowNodes, flowEdges } = useMemo(() => {
     if (treeData.messages.length === 0) {
@@ -178,6 +322,7 @@ export function TreePanel() {
         content: extractTextContent(message),
         isActive: activeMessageIds.has(message.id),
         isHead: message.id === treeData.headId,
+        metadata: extractMetadata(message),
       }),
     );
 
@@ -189,12 +334,17 @@ export function TreePanel() {
 
       return {
         id: n.id,
+        type: "treeNode",
         position: pos,
         data: {
           label: n.content,
           role: n.role,
+          roleLabel: style.label,
           isActive: n.isActive,
           isHead: n.isHead,
+          nodeId: n.id,
+          metadata: n.metadata,
+          onFork: handleFork,
         },
         style: {
           width: NODE_W,
@@ -238,9 +388,9 @@ export function TreePanel() {
       });
 
     return { flowNodes: nodes, flowEdges: edges };
-  }, [treeData, activeMessageIds]);
+  }, [treeData, activeMessageIds, handleFork]);
 
-  // Handle node click — navigate to the clicked node's branch
+  // Handle node click -- navigate to the clicked node's branch
   const onNodeClick: NodeMouseHandler = useCallback(
     (_event, clickedNode) => {
       try {
@@ -283,6 +433,7 @@ export function TreePanel() {
       <ReactFlow
         nodes={flowNodes}
         edges={flowEdges}
+        nodeTypes={nodeTypes}
         onNodeClick={onNodeClick}
         onInit={(instance) => {
           rfInstance.current = instance;
