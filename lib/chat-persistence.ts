@@ -149,15 +149,18 @@ export async function getChatNodesWithMetadata(
 }
 
 /**
- * List all chats for a given user, ordered by most-recently-created first.
- * userId is required to prevent leaking chats across users.
+ * List chats ordered by most-recently-created first.
+ * If userId is provided, only return that user's chats.
  */
-export async function listChats(userId: string): Promise<Chat[]> {
-	return db
-		.select()
-		.from(chat)
-		.where(eq(chat.userId, userId))
-		.orderBy(desc(chat.createdAt));
+export async function listChats(userId?: string): Promise<Chat[]> {
+	if (userId) {
+		return db
+			.select()
+			.from(chat)
+			.where(eq(chat.userId, userId))
+			.orderBy(desc(chat.createdAt));
+	}
+	return db.select().from(chat).orderBy(desc(chat.createdAt));
 }
 
 /**

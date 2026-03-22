@@ -30,14 +30,8 @@ export async function POST(req: Request) {
 		);
 	}
 
-	// --- Auth check ---
+	// --- Optional auth (for user-specific API keys) ---
 	const sessionData = await getSession();
-	if (!sessionData) {
-		return new Response(JSON.stringify({ error: "Unauthorized" }), {
-			status: 401,
-			headers: { "Content-Type": "application/json" },
-		});
-	}
 
 	const {
 		messages,
@@ -64,8 +58,13 @@ export async function POST(req: Request) {
 	let userOpenRouterKey: string | null = null;
 	let userOpenAIKey: string | null = null;
 
-	userOpenRouterKey = await getUserApiKey(sessionData.userId, "openrouter");
-	userOpenAIKey = await getUserApiKey(sessionData.userId, "openai");
+	if (sessionData) {
+		userOpenRouterKey = await getUserApiKey(
+			sessionData.userId,
+			"openrouter",
+		);
+		userOpenAIKey = await getUserApiKey(sessionData.userId, "openai");
+	}
 
 	// Determine which provider/key to use
 	// Priority: user key > env var

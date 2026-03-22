@@ -52,9 +52,6 @@ interface SyncRequestBody {
 export async function POST(req: Request) {
 	try {
 		const sessionData = await getSession();
-		if (!sessionData) {
-			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-		}
 
 		const body = (await req.json()) as SyncRequestBody;
 		const { chatId, title, messages } = body;
@@ -84,7 +81,7 @@ export async function POST(req: Request) {
 		}
 
 		// Ensure the chat exists
-		await getOrCreateChat(chatId, title, sessionData.userId);
+		await getOrCreateChat(chatId, title, sessionData?.userId);
 
 		const validRoles = new Set(["user", "assistant", "system"]);
 		let saved = 0;

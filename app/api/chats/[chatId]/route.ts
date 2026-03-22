@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { deleteChat, getChat, updateChatTitle } from "@/lib/chat-persistence";
-import { getSession } from "@/lib/session";
 import { MAX_TITLE_LENGTH, validateOptionalString } from "@/lib/validation";
 
 /**
@@ -11,21 +10,11 @@ export async function GET(
 	{ params }: { params: Promise<{ chatId: string }> },
 ) {
 	try {
-		const sessionData = await getSession();
-		if (!sessionData) {
-			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-		}
-
 		const { chatId } = await params;
 		const chatRecord = await getChat(chatId);
 
 		if (!chatRecord) {
 			return NextResponse.json({ error: "Chat not found" }, { status: 404 });
-		}
-
-		// Ownership check: chat must belong to this user (or have no user - legacy)
-		if (chatRecord.userId && chatRecord.userId !== sessionData.userId) {
-			return NextResponse.json({ error: "Not found" }, { status: 404 });
 		}
 
 		return NextResponse.json(chatRecord);
@@ -37,21 +26,12 @@ export async function GET(
 
 /**
  * PATCH /api/chats/[chatId] — Update a chat's title.
- * Body: { title?: string }
- *
- * Archive/unarchive is handled by prefixing/removing "[archived] " from the title.
- * TODO: Add a proper `archived_at` column to the schema for cleaner archive support.
  */
 export async function PATCH(
 	req: Request,
 	{ params }: { params: Promise<{ chatId: string }> },
 ) {
 	try {
-		const sessionData = await getSession();
-		if (!sessionData) {
-			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-		}
-
 		const { chatId } = await params;
 		const body = await req.json();
 
@@ -69,17 +49,10 @@ export async function PATCH(
 			return NextResponse.json({ error: "Chat not found" }, { status: 404 });
 		}
 
-		// Ownership check: chat must belong to this user (or have no user - legacy)
-		if (chatRecord.userId && chatRecord.userId !== sessionData.userId) {
-			return NextResponse.json({ error: "Not found" }, { status: 404 });
-		}
-
-		// Handle explicit title update
 		if (typeof body.title === "string") {
 			await updateChatTitle(chatId, body.title);
 		}
 
-		// Handle archive/unarchive via title prefix convention
 		if (typeof body.archived === "boolean") {
 			const currentTitle = body.title ?? chatRecord.title ?? "New Chat";
 			const isCurrentlyArchived = currentTitle.startsWith("[archived] ");
@@ -88,7 +61,6 @@ export async function PATCH(
 				: currentTitle;
 
 			const newTitle = body.archived ? `[archived] ${cleanTitle}` : cleanTitle;
-
 			await updateChatTitle(chatId, newTitle);
 		}
 
@@ -110,22 +82,7 @@ export async function DELETE(
 	{ params }: { params: Promise<{ chatId: string }> },
 ) {
 	try {
-		const sessionData = await getSession();
-		if (!sessionData) {
-			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-		}
-
 		const { chatId } = await params;
-		const chatRecord = await getChat(chatId);
-		if (!chatRecord) {
-			return NextResponse.json({ error: "Chat not found" }, { status: 404 });
-		}
-
-		// Ownership check: chat must belong to this user (or have no user - legacy)
-		if (chatRecord.userId && chatRecord.userId !== sessionData.userId) {
-			return NextResponse.json({ error: "Not found" }, { status: 404 });
-		}
-
 		await deleteChat(chatId);
 		return NextResponse.json({ success: true });
 	} catch (error) {
