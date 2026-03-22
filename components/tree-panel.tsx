@@ -243,12 +243,38 @@ export function TreePanel() {
 	const setBranchLabel = useBranchLabelsStore((s) => s.setLabel);
 	const removeBranchLabel = useBranchLabelsStore((s) => s.removeLabel);
 
-	// Subscribe to runtime changes and export the full tree
+	// Cumulative message map — never loses nodes even when runtime trims them.
+	// This ensures the full tree is always visible regardless of where the head is.
+	const allMessagesRef = useRef(
+		new Map<
+			string,
+			{ message: ThreadMessage; parentId: string | null }
+		>(),
+	);
+
+	// Clear cumulative map when switching threads
+	const prevRuntimeRef = useRef(threadRuntime);
+	if (prevRuntimeRef.current !== threadRuntime) {
+		allMessagesRef.current.clear();
+		prevRuntimeRef.current = threadRuntime;
+	}
+
+	// Subscribe to runtime changes and merge into cumulative map
 	useEffect(() => {
 		const update = () => {
 			try {
 				const exported = threadRuntime.export();
-				setTreeData(exported);
+
+				// Merge new messages into the cumulative map
+				for (const entry of exported.messages) {
+					allMessagesRef.current.set(entry.message.id, entry);
+				}
+
+				// Build the full tree data from the cumulative map
+				setTreeData({
+					headId: exported.headId,
+					messages: Array.from(allMessagesRef.current.values()),
+				});
 			} catch {
 				// Runtime may not be ready yet
 			}
