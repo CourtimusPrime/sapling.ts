@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { deleteChat, getChat, updateChatTitle } from "@/lib/chat-persistence";
+import { validateOptionalString, MAX_TITLE_LENGTH } from "@/lib/validation";
 
 /**
  * GET /api/chats/[chatId] — Get a single chat by id.
@@ -37,6 +38,11 @@ export async function PATCH(
 	try {
 		const { chatId } = await params;
 		const body = await req.json();
+
+		const titleError = validateOptionalString(body.title, "title", MAX_TITLE_LENGTH);
+		if (titleError) {
+			return NextResponse.json({ error: titleError }, { status: 400 });
+		}
 
 		const chatRecord = await getChat(chatId);
 		if (!chatRecord) {

@@ -4,6 +4,12 @@ import {
   saveNode,
   saveNodeMetadata,
 } from "@/lib/chat-persistence";
+import {
+  validateString,
+  validateOptionalString,
+  MAX_ID_LENGTH,
+  MAX_TITLE_LENGTH,
+} from "@/lib/validation";
 
 interface SyncMessage {
   id: string;
@@ -47,11 +53,14 @@ export async function POST(req: Request) {
     const body = (await req.json()) as SyncRequestBody;
     const { chatId, title, messages } = body;
 
-    if (!chatId || typeof chatId !== "string") {
-      return NextResponse.json(
-        { error: "Missing or invalid 'chatId' field" },
-        { status: 400 },
-      );
+    const chatIdError = validateString(chatId, "chatId", MAX_ID_LENGTH);
+    if (chatIdError) {
+      return NextResponse.json({ error: chatIdError }, { status: 400 });
+    }
+
+    const titleError = validateOptionalString(title, "title", MAX_TITLE_LENGTH);
+    if (titleError) {
+      return NextResponse.json({ error: titleError }, { status: 400 });
     }
 
     if (!Array.isArray(messages)) {

@@ -5,6 +5,12 @@ import {
   saveNode,
   saveNodeMetadata,
 } from "@/lib/chat-persistence";
+import {
+  validateString,
+  validateRole,
+  MAX_ID_LENGTH,
+  MAX_CONTENT_LENGTH,
+} from "@/lib/validation";
 
 /**
  * GET /api/chats/[chatId]/nodes — Get all nodes for a chat.
@@ -53,42 +59,36 @@ export async function POST(
       };
     };
 
-    if (!id || typeof id !== "string") {
-      return NextResponse.json(
-        { error: "Missing or invalid 'id' field" },
-        { status: 400 },
-      );
+    const idError = validateString(id, "id", MAX_ID_LENGTH);
+    if (idError) {
+      return NextResponse.json({ error: idError }, { status: 400 });
     }
 
-    if (!role || !["user", "assistant", "system"].includes(role)) {
-      return NextResponse.json(
-        { error: "Missing or invalid 'role' field (must be user, assistant, or system)" },
-        { status: 400 },
-      );
+    const roleError = validateRole(role);
+    if (roleError) {
+      return NextResponse.json({ error: roleError }, { status: 400 });
     }
 
-    if (typeof content !== "string") {
-      return NextResponse.json(
-        { error: "Missing or invalid 'content' field" },
-        { status: 400 },
-      );
+    const contentError = validateString(content, "content", MAX_CONTENT_LENGTH);
+    if (contentError) {
+      return NextResponse.json({ error: contentError }, { status: 400 });
     }
 
     // Ensure the chat exists
     await getOrCreateChat(chatId);
 
     await saveNode({
-      id,
+      id: id!,
       chatId,
       parentId: parentId ?? null,
       role: role as "user" | "assistant" | "system",
-      content,
+      content: content!,
     });
 
     // Save metadata if provided (typically for assistant messages)
     if (metadata) {
       await saveNodeMetadata({
-        nodeId: id,
+        nodeId: id!,
         ...metadata,
       });
     }

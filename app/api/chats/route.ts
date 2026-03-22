@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { createChat, listChats } from "@/lib/chat-persistence";
+import {
+  validateString,
+  validateOptionalString,
+  MAX_ID_LENGTH,
+  MAX_TITLE_LENGTH,
+} from "@/lib/validation";
 
 /**
  * GET /api/chats — List all chats ordered by createdAt desc.
@@ -26,14 +32,17 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { id, title } = body as { id?: string; title?: string };
 
-    if (!id || typeof id !== "string") {
-      return NextResponse.json(
-        { error: "Missing or invalid 'id' field" },
-        { status: 400 },
-      );
+    const idError = validateString(id, "id", MAX_ID_LENGTH);
+    if (idError) {
+      return NextResponse.json({ error: idError }, { status: 400 });
     }
 
-    await createChat(id, title);
+    const titleError = validateOptionalString(title, "title", MAX_TITLE_LENGTH);
+    if (titleError) {
+      return NextResponse.json({ error: titleError }, { status: 400 });
+    }
+
+    await createChat(id!, title);
 
     return NextResponse.json({ id, title: title ?? null }, { status: 201 });
   } catch (error) {
